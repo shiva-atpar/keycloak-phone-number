@@ -52,8 +52,14 @@ public class SmsService {
         final var clientId = Utils.getEnv("OAUTH2_CLIENT_ID");
         final var clientSecret = Utils.getEnv("OAUTH2_CLIENT_SECRET");
         final var tokenEndpoint = Utils.getEnv("OAUTH2_TOKEN_ENDPOINT");
-        final var allowedCountries = Pattern.compile(Utils.getEnv(ConfigKey.ALLOWED_COUNTRY_PATTERN, "*"), Pattern.CASE_INSENSITIVE).asMatchPredicate();
-
+        final var allowedCountries = Pattern.compile(Utils.getEnv(ConfigKey.ALLOWED_COUNTRY_PATTERN, "\\*.*"), Pattern.CASE_INSENSITIVE).asMatchPredicate();
+        System.out.println(smsUrl+""+
+                basicUsr+""+
+                basicPwd+""+
+                clientId+""+
+                clientSecret+""+
+                tokenEndpoint+""+
+                allowedCountries);
         final var apiClient = new ApiClient();
         apiClient.updateBaseUri(smsUrl);
         apiClient.setRequestInterceptor(builder -> {
@@ -75,8 +81,23 @@ public class SmsService {
         });
 
         instance = new SmsService(apiClient);
+        allCountries =phoneNumberUtil.getSupportedRegions().stream().map(supportedRegion->{
+            final var countryCode = phoneNumberUtil.getCountryCodeForRegion(supportedRegion);
+            final var locale = new Locale("", supportedRegion);
+            final var countryName = locale.getDisplayCountry();
 
-        allCountries = phoneNumberUtil.getSupportedCallingCodes()
+                    /*if (!allowedCountries.test(countryName)) {
+                        log.debug(String.format("Country %s (%s) is not allowed", countryName, countryCode));
+                        return null;
+                    }*/
+            System.out.println("countryCode = " + countryCode+", countryName = " + countryName);
+            log.debug(String.format("Country %s (%s) is allowed", countryName, countryCode));
+            return new CountryPhoneCode(countryName, "+" + countryCode);
+
+        }) .filter(Objects::nonNull)
+                .sorted(Comparator.comparing(o -> o.label))
+                .collect(Collectors.toCollection(LinkedHashSet::new));;
+        /*allCountries = phoneNumberUtil.getSupportedCallingCodes()
                 .stream()
                 .map(supportedCallingCode -> {
                     final var countryCode = phoneNumberUtil.getRegionCodeForCountryCode(supportedCallingCode);
@@ -87,13 +108,13 @@ public class SmsService {
                         log.debug(String.format("Country %s (%s) is not allowed", countryName, countryCode));
                         return null;
                     }
-
+                    System.out.println("countryCode = " + countryCode+", countryName = " + countryName);
                     log.debug(String.format("Country %s (%s) is allowed", countryName, countryCode));
                     return new CountryPhoneCode(countryName, "+" + supportedCallingCode);
                 })
                 .filter(Objects::nonNull)
                 .sorted(Comparator.comparing(o -> o.label))
-                .collect(Collectors.toCollection(LinkedHashSet::new));
+                .collect(Collectors.toCollection(LinkedHashSet::new));*/
     }
 
     private final SmsApi smsApi;
