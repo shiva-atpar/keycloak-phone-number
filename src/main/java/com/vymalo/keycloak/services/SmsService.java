@@ -49,9 +49,12 @@ public class SmsService {
         final var smsUrl = Utils.getEnv(ConfigKey.CONF_PRP_SMS_URL);
         final var basicUsr = Utils.getEnv(ConfigKey.BASIC_AUTH_USERNAME);
         final var basicPwd = Utils.getEnv(ConfigKey.BASIC_AUTH_PASSWORD);
-        final var clientId = Utils.getEnv("OAUTH2_CLIENT_ID");
-        final var clientSecret = Utils.getEnv("OAUTH2_CLIENT_SECRET");
-        final var tokenEndpoint = Utils.getEnv("OAUTH2_TOKEN_ENDPOINT");
+//        final var clientId = Utils.getEnv("OAUTH2_CLIENT_ID");
+//        final var clientSecret = Utils.getEnv("OAUTH2_CLIENT_SECRET");
+//        final var tokenEndpoint = Utils.getEnv("OAUTH2_TOKEN_ENDPOINT");
+        final var clientId = "aurigraph_awd";
+        final var clientSecret = "9ZC7DLaGPaOwKGfFPPMJ4qjG4z1JVgTf";
+        final var tokenEndpoint = "http://192.168.0.102:8089/auth/realms/Aurigraph/protocol/openid-connect/token";
         final var allowedCountries = Pattern.compile(Utils.getEnv(ConfigKey.ALLOWED_COUNTRY_PATTERN, "\\*.*"), Pattern.CASE_INSENSITIVE).asMatchPredicate();
         System.out.println(smsUrl+""+
                 basicUsr+""+
@@ -67,6 +70,7 @@ public class SmsService {
             if (StringUtils.isNotEmpty(tokenEndpoint) && StringUtils.isNotEmpty(clientId) && StringUtils.isNotEmpty(clientSecret)) {
                 try {
                     String token = getAccessToken(clientId, clientSecret, tokenEndpoint);
+                    System.out.println(token);
                     builder.header("Authorization", "Bearer " + token);
                 } catch (Exception e) {
                     log.error("Failed to set OAuth2 token, falling back to no auth", e);
@@ -151,15 +155,19 @@ public class SmsService {
     }
 
     public Optional<String> sendSmsAndGetHash(String phoneNumber) {
-        final var request = new SendSmsRequest()
-                .phoneNumber(phoneNumber);
+//        final var request = new SendSmsRequest()
+//                .phoneNumber(phoneNumber);
 
-        try {
-            return Optional.ofNullable(smsApi.sendSms(request).getHash());
-        } catch (ApiException e) {
-            log.error("Failed to send SMS", e);
-            return Optional.empty();
-        }
+        TwilioServiceImpl twilioService = new TwilioServiceImpl();
+
+        twilioService.initializeTwilio();
+
+//        try {
+            return Optional.ofNullable(twilioService.sendOtp(phoneNumber, "435678"));
+//        } catch (ApiException e) {
+//            log.error("Failed to send SMS", e);
+//            return Optional.empty();
+//        }
     }
 
     public Optional<Boolean> confirmSmsCode(String phoneNumber, String code, String hash) {
