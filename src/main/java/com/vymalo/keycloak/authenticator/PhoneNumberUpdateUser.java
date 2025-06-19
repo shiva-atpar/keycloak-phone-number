@@ -47,8 +47,11 @@ public class PhoneNumberUpdateUser extends AbstractPhoneNumberAuthenticator {
 
     @Override
     public void setRequiredActions(KeycloakSession session, RealmModel realm, UserModel user) {
+        user.addRequiredAction(UserModel.RequiredAction.UPDATE_PASSWORD);
         user.addRequiredAction(UserModel.RequiredAction.UPDATE_PROFILE);
         user.addRequiredAction(UserModel.RequiredAction.TERMS_AND_CONDITIONS);
+        ;
+
     }
 
     @Override

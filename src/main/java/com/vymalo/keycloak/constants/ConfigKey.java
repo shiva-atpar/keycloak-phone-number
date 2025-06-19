@@ -9,6 +9,8 @@ public class ConfigKey {
 
     public static final String USER_PHONE_ATTRIBUTE_NAME = "SMS_API_ATTRIBUTE_PHONE_NAME";
 
+    public static final String USERNAME_ATTRIBUTE_NAME = "USERNAME";
+
     private ConfigKey() {
     }
 }

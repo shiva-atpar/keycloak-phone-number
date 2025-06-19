@@ -4,12 +4,16 @@ import com.vymalo.keycloak.constants.ConfigKey;
 import com.vymalo.keycloak.constants.PhoneKey;
 import com.vymalo.keycloak.constants.PhoneNumberHelper;
 import com.vymalo.keycloak.constants.Utils;
+import com.vymalo.keycloak.services.SmsService;
 import lombok.NoArgsConstructor;
 import lombok.extern.jbosslog.JBossLog;
 import org.keycloak.authentication.AuthenticationFlowContext;
 import org.keycloak.events.Errors;
 import org.keycloak.models.AuthenticationExecutionModel;
 import org.keycloak.models.UserProvider;
+import org.keycloak.userprofile.UserProfile;
+import org.keycloak.userprofile.UserProfileContext;
+import org.keycloak.userprofile.UserProfileProvider;
 
 import java.util.Collections;
 
@@ -52,20 +56,73 @@ public class PhoneNumberChooseUser extends AbstractPhoneNumberAuthenticator {
                     .toList();
 
             if (users.isEmpty() && user == null) {
-                final var newUser = userProvider.addUser(realm, phoneNumber);
-                newUser.setAttribute(attrName, Collections.singletonList(phoneNumber));
-                newUser.setEnabled(true);
-                user = newUser;
+                //final var newUser = userProvider.addUser(realm, phoneNumber);
+                //newUser.setAttribute(attrName, Collections.singletonList(phoneNumber));
+                //newUser.setEnabled(true);
+                //user = newUser;
+                final var challenge = context.form().setUser(user)
+                        .setAttribute("phoneNumber", phoneNumber)
+                        //.setAttribute("countries", SmsService.getAllCountries())
+                        .createForm("register-user-phone-number.ftl");
+                context.challenge(challenge);
             } else {
                 user = users.get(0);
+                context.success();
             }
         }
 
-        context.setUser(user);
-        context
-                .getAuthenticationSession()
-                .setAuthNote(PhoneKey.ATTEMPTED_PHONE_NUMBER, phoneNumber);
 
+
+        //context.success();
+    }
+
+    @Override
+    public void action(AuthenticationFlowContext context) {
+        final var formData = context.getHttpRequest().getDecodedFormParameters();
+        final var attrName = Utils
+                .getEnv(ConfigKey.USERNAME_ATTRIBUTE_NAME, PhoneNumberHelper.USERNAME_KEY_NAME);
+        var user = context.getUser();
+        final var event = context.getEvent();
+        final var authenticationSession = context.getAuthenticationSession();
+        final var phoneNumber = authenticationSession.getAuthNote(PhoneKey.ATTEMPTED_PHONE_NUMBER);
+        if (user != null && !user.isEnabled()) {
+            event.detail("phone_number", phoneNumber)
+                    .user(user)
+                    .error(Errors.USER_DISABLED);
+            context.clearUser();
+            context.resetFlow();
+            return;
+        }
+
+
+        final var firstName = formData.getFirst("firstName");
+        final var lastName = formData.getFirst("lastName");
+        final var email = formData.getFirst("email");
+        final var username = formData.getFirst("username");
+        final var realm = context.getRealm();
+        UserProvider userProvider = context.getSession().users();
+        final var users = userProvider
+                .searchForUserByUserAttributeStream(realm, attrName, phoneNumber)
+                .toList();
+        user = userProvider.getUserByUsername(realm,username);
+        if (users.isEmpty()  || user==null) {
+            final var newUser = userProvider.addUser(realm, username);
+            newUser.setAttribute(attrName, Collections.singletonList(username));
+            newUser.setEnabled(true);
+            context.setUser(newUser);
+            context.success();
+        }else{
+
+            final var challenge = context.form().setUser(user)
+                    .setAttribute("phoneNumber", phoneNumber)
+                    .createForm("register-user-phone-number.ftl");
+            context.challenge(challenge);
+        }
+
+        final var cancel = formData.getFirst("cancel");
+        if (cancel != null) {
+            context.resetFlow();
+        }
         context.success();
     }
 

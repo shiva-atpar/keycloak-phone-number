@@ -16,6 +16,7 @@ import org.keycloak.authentication.authenticators.broker.AbstractIdpAuthenticato
 import org.keycloak.events.EventBuilder;
 import org.keycloak.models.AuthenticationExecutionModel;
 import org.keycloak.models.UserModel;
+import org.keycloak.models.UserProvider;
 
 import static org.keycloak.models.DefaultActionTokenKey.ACTION_TOKEN_USER_ID;
 
@@ -80,6 +81,9 @@ public class PhoneNumberGetNumber extends AbstractPhoneNumberAuthenticator {
 
         String phoneNumberWithoutPrefix = formData.getFirst("phone");
         String regionPrefix = formData.getFirst("regionPrefix");
+        final var realm = context.getRealm();
+        final var attrName = Utils
+                .getEnv(ConfigKey.USER_PHONE_ATTRIBUTE_NAME, PhoneNumberHelper.DEFAULT_PHONE_KEY_NAME);
 
         if (phoneNumberWithoutPrefix == null
                 || phoneNumberWithoutPrefix.isEmpty()
@@ -104,7 +108,32 @@ public class PhoneNumberGetNumber extends AbstractPhoneNumberAuthenticator {
         final var phoneNumber = regionPrefix + phoneNumberWithoutPrefix;
 
         final var phoneNumber$ = smsService.format(phoneNumber);
-        if (phoneNumber$.isEmpty()) {
+
+        UserProvider userProvider = context.getSession().users();
+
+        if(phoneNumber$.isPresent()) {
+            final var users = userProvider
+                    .searchForUserByUserAttributeStream(realm, attrName, phoneNumber$.get())
+                    .toList();
+            var user = context.getUser();
+            if (!users.isEmpty()  || user!=null) {
+                event.clone()
+                        .detail("phone_number", phoneNumber)
+                        .error("Phone number already exists");
+                context.clearUser();
+                Response challenge = context
+                        .form()
+                        .setError("Phone Number is already registered. Please use a different phone number.")
+                        .setAttribute("phoneNumber", phoneNumberWithoutPrefix)
+                        .setAttribute("regionPrefix", regionPrefix)
+                        .setAttribute("countries", SmsService.getAllCountries())
+                        .createForm("request-user-phone-number.ftl");
+                context.failureChallenge(AuthenticationFlowError.INVALID_CREDENTIALS, challenge);
+                return;
+            }
+        }
+
+        if (phoneNumber$.isEmpty() ) {
             event.clone()
                     .detail("phone_number", phoneNumber)
                     .error("parse number error: Can't parse phone number");
@@ -135,7 +164,7 @@ public class PhoneNumberGetNumber extends AbstractPhoneNumberAuthenticator {
     public String getReferenceCategory() {
         return "get-phone-number";
     }
-    
+
     @Override
     public AuthenticationExecutionModel.Requirement[] getRequirementChoices() {
         return REQUIREMENT_CHOICES;
